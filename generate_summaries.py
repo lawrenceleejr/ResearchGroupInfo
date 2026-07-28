@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Group-wide summary CSV generator.
+
+Reads a directory of per-person Research Record spreadsheets (the same inputs
+as ``generate_dashboard.py``) and writes summary CSVs aggregated across the
+whole group:
+
+    presentations.csv   every talk / poster / seminar, one row each
+    publications.csv     every paper / note, one row each
+    conferences.csv      unique conferences/meetings attended, with attendees
+    schools.csv          unique schools / lecture courses attended
+
+Conferences and schools are derived from the Presentations tab (the template
+has no separate attendance field): each presentation implies attendance at its
+venue. Entries typed as "Lecture" — or whose venue name looks like a school /
+academy / training event — are classified as schools; everything else is a
+conference. Rows are grouped by venue *series* (a trailing year is stripped),
+so "USMCC 2025" and "USMCC 2026" collapse to one "USMCC" row spanning both
+years.
+
+Usage:
+    python generate_summaries.py <input_dir> [-o output_dir]
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import glob
+import os
+import re
+import sys
+
+from generate_dashboard import parse_workbook
+
+SCHOOL_RE = re.compile(r"\b(school|academy|tutorial)\b", re.I)
+SCHOOL_TYPES = {"lecture"}
+
+
+def _year(date: str) -> str:
+    m = re.search(r"(?:19|20)\d{2}", date or "")
+    return m.group(0) if m else ""
+
+
+def _venue_series(venue: str) -> str:
+    """Normalise a venue to its series name by stripping a trailing year."""
+    v = (venue or "").strip()
+    v = re.sub(r"[\s,'’]*(?:19|20)\d{2}\s*$", "", v).strip(" ,-–")
+    return v or (venue or "").strip()
+
+
+def _is_school(pres: dict) -> bool:
+    if (pres.get("type") or "").strip().lower() in SCHOOL_TYPES:
+        return True
+    return bool(SCHOOL_RE.search(pres.get("venue") or ""))
+
+
+def _sorted_join(values) -> str:
+    return "; ".join(sorted(v for v in dict.fromkeys(values) if v))
+
+
+def load_people(input_dir: str) -> list[dict]:
+    paths = sorted(
+        p for p in glob.glob(os.path.join(input_dir, "*.xlsx"))
+        if not os.path.basename(p).startswith(("~$", "."))
+    )
+    if not paths:
+        sys.exit(f"No .xlsx files found in {input_dir}")
+    people = []
+    for path in paths:
+        try:
+            people.append(parse_workbook(path))
+        except Exception as exc:
+            print(f"  SKIP {os.path.basename(path)}: {exc}", file=sys.stderr)
+    if not people:
+        sys.exit("No records could be parsed.")
+    return people
+
+
+def write_presentations(people, out_dir) -> int:
+    path = os.path.join(out_dir, "presentations.csv")
+    n = 0
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["Person", "Type", "Venue / meeting", "Location", "Date",
+                    "Title", "Invited?", "External travel funding", "Link"])
+        for p in people:
+            for r in p.get("presentations", []):
+                w.writerow([p["name"], r.get("type", ""), r.get("venue", ""),
+                            r.get("location", ""), r.get("date", ""), r.get("title", ""),
+                            r.get("invited", ""), r.get("travel", ""), r.get("link", "")])
+                n += 1
+    print(f"  wrote {os.path.basename(path)}  ({n} rows)")
+    return n
+
+
+def write_publications(people, out_dir) -> int:
+    path = os.path.join(out_dir, "publications.csv")
+    n = 0
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["Person", "Title", "Role", "Journal / collaboration",
+                    "Status", "Date", "DOI / link"])
+        for p in people:
+            for r in p.get("publications", []):
+                w.writerow([p["name"], r.get("title", ""), r.get("role", ""),
+                            r.get("journal", ""), r.get("status", ""), r.get("date", ""),
+                            r.get("doi", "")])
+                n += 1
+    print(f"  wrote {os.path.basename(path)}  ({n} rows)")
+    return n
+
+
+def _aggregate_venues(people, want_schools: bool):
+    """Group presentation venues into a {series: aggregate} dict."""
+    agg: dict[str, dict] = {}
+    for p in people:
+        for r in p.get("presentations", []):
+            if _is_school(r) != want_schools:
+                continue
+            venue = (r.get("venue") or "").strip()
+            if not venue:
+                continue
+            key = _venue_series(venue).lower()
+            entry = agg.setdefault(key, {
+                "name": _venue_series(venue), "attendees": [], "years": [],
+                "locations": [], "types": [], "count": 0,
+            })
+            entry["attendees"].append(p["name"])
+            entry["years"].append(_year(r.get("date", "")))
+            entry["locations"].append(r.get("location", ""))
+            entry["types"].append(r.get("type", ""))
+            entry["count"] += 1
+    return agg
+
+
+def write_conferences(people, out_dir) -> int:
+    path = os.path.join(out_dir, "conferences.csv")
+    agg = _aggregate_venues(people, want_schools=False)
+    rows = sorted(agg.values(), key=lambda e: (-e["count"], e["name"].lower()))
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["Conference / meeting", "Attendees", "# Attendees",
+                    "Years", "Locations", "# Presentations", "Contribution types"])
+        for e in rows:
+            attendees = list(dict.fromkeys(e["attendees"]))
+            w.writerow([e["name"], "; ".join(sorted(attendees)), len(attendees),
+                        _sorted_join(e["years"]), _sorted_join(e["locations"]),
+                        e["count"], _sorted_join(e["types"])])
+    print(f"  wrote {os.path.basename(path)}  ({len(rows)} rows)")
+    return len(rows)
+
+
+def write_schools(people, out_dir) -> int:
+    path = os.path.join(out_dir, "schools.csv")
+    agg = _aggregate_venues(people, want_schools=True)
+    rows = sorted(agg.values(), key=lambda e: (-e["count"], e["name"].lower()))
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["School / course", "Attendees", "# Attendees",
+                    "Years", "Locations", "# Sessions"])
+        for e in rows:
+            attendees = list(dict.fromkeys(e["attendees"]))
+            w.writerow([e["name"], "; ".join(sorted(attendees)), len(attendees),
+                        _sorted_join(e["years"]), _sorted_join(e["locations"]), e["count"]])
+    print(f"  wrote {os.path.basename(path)}  ({len(rows)} rows)")
+    return len(rows)
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("input_dir", help="directory containing the per-person .xlsx records")
+    ap.add_argument("-o", "--output-dir", default=".", help="directory to write the CSVs into")
+    args = ap.parse_args(argv)
+
+    if not os.path.isdir(args.input_dir):
+        sys.exit(f"Not a directory: {args.input_dir}")
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    people = load_people(args.input_dir)
+    print(f"Parsed {len(people)} record(s). Writing summaries to {args.output_dir}/")
+    write_presentations(people, args.output_dir)
+    write_publications(people, args.output_dir)
+    write_conferences(people, args.output_dir)
+    write_schools(people, args.output_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
