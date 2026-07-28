@@ -63,6 +63,30 @@ automatically when there's no data for it):
 Research themes and their colors are assigned automatically from whatever
 themes appear in the data, so the dashboard adapts to any group.
 
+## Summary CSVs
+
+`generate_summaries.py` writes group-wide summary CSVs from the same inputs:
+
+```bash
+python generate_summaries.py <input_dir> -o summaries/
+```
+
+| File | Contents |
+|------|----------|
+| `presentations.csv` | Every talk / poster / seminar, one row each |
+| `publications.csv` | Every paper / note, one row each |
+| `conferences.csv` | Unique conferences attended, with attendees, years, and presentation counts |
+| `schools.csv` | Unique schools / lecture courses attended, with attendees |
+
+Conferences and schools are **derived from the Presentations tab** (the template
+has no separate attendance field): each presentation implies attendance at its
+venue. Entries typed `Lecture` — or whose venue name contains *school* /
+*academy* / *tutorial* — are counted as schools; everything else is a
+conference. Venues are grouped by series (a trailing year is stripped), so
+`USMCC 2025` and `USMCC 2026` collapse into one `USMCC` row spanning both years.
+
+A pre-built demo lives in [`summaries/`](summaries/).
+
 ## Trying it out
 
 Sample records and a pre-built demo are included:
@@ -79,9 +103,11 @@ The committed [`dashboard.html`](dashboard.html) is that demo output.
 ```
 template/FirstnameLastname_Info_Template.xlsx   the master spreadsheet
 generate_dashboard.py                           reads a dir of records → HTML
+generate_summaries.py                           reads a dir of records → summary CSVs
 make_sample_data.py                             writes illustrative sample records
 sample_data/                                    generated sample records
 dashboard.html                                  demo output (from sample_data)
+summaries/                                       demo CSV output (from sample_data)
 requirements.txt                                openpyxl
 ```
 

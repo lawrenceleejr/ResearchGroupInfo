@@ -90,6 +90,7 @@ PEOPLE = [
             ["1", "Contributed talk", "USMCC 2025", "Chicago, IL", "2025-06", "Muon cooling channel design", "No", 600, ""],
             ["2", "Poster", "USMCC 2025", "Chicago, IL", "2025-06", "Cooling cell optimization", "No", 0, ""],
             ["3", "Contributed talk", "IMCC 2026", "CERN", "2026-05", "Updated cooling results", "No", 1200, ""],
+            ["4", "Lecture", "US Particle Accelerator School 2025", "Knoxville, TN", "2025-01", "Attendee — accelerator physics", "No", 0, ""],
         ],
         "awards": [
             ["1", "Best Poster Prize", "USMCC", "2025-06", "$500", ""],
