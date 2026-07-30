@@ -5,10 +5,15 @@
  * "Research Record" spreadsheets. No command line, nothing to install.
  *
  * It reproduces generate_dashboard.py: it reads every Google Sheet in a folder,
- * parses the 11 tabs, and writes a date-stamped `dashboard_YYYY-MM-DD.html` back
- * into the folder (older snapshots are kept, so a history builds up). It can run
- * from a menu, on a daily time-driven trigger, or be published as a web app so
- * the whole group can bookmark a live URL.
+ * parses the 11 tabs, and writes a timestamped `dashboard_YYYY-MM-DD_HHMM.html`
+ * back into the folder (older snapshots are kept, so a history builds up). It can
+ * run from a menu, on a daily time-driven trigger, or be published as a web app
+ * so the whole group can bookmark a live URL.
+ *
+ * VIEWING: Google Drive does not render HTML pages, so double-clicking the
+ * generated file only offers a download. To view the dashboard live, deploy this
+ * as a Web app (see README) and use that URL; to view an archived snapshot,
+ * download that timestamped .html and open it in a browser.
  *
  * SETUP
  *   1. Put the members' records in one Drive folder (as Google Sheets — open
@@ -55,9 +60,10 @@ function generateDashboard() {
   var html = renderHtml_(model);
   var out = OUTPUT_FOLDER_ID ? DriveApp.getFolderById(OUTPUT_FOLDER_ID)
                              : DriveApp.getFolderById(FOLDER_ID);
-  // Date-stamped filename so a history builds up in Drive. Only a file from
-  // the same day is replaced; older snapshots are kept.
-  var name = 'dashboard_' + model.group.generated + '.html';
+  // Timestamped filename (date + time) so every run is kept and a history
+  // builds up in Drive. Only an exact same-minute name is replaced.
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm');
+  var name = 'dashboard_' + stamp + '.html';
   var existing = out.getFilesByName(name);
   while (existing.hasNext()) existing.next().setTrashed(true);
   var file = out.createFile(name, html, MimeType.HTML);

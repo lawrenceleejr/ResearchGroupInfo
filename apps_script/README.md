@@ -1,13 +1,14 @@
-# Run it inside Google Drive — no command line
+# Run it inside Google Drive — no command line (recommended)
 
-This folder is a **Google Apps Script** port of `generate_dashboard.py`. It runs
-on Google's servers against your Drive folder, so nobody in the group ever
-installs or runs anything locally. Members just keep their spreadsheets current;
-the dashboard regenerates itself.
+This is the **recommended way to run the tool**. It's a **Google Apps Script**
+that runs on Google's servers against your Drive folder, so nobody in the group
+ever installs or runs anything locally. Members just keep their spreadsheets
+current; the dashboard regenerates itself.
 
-It reads every Google Sheet in a folder, parses the same 11 tabs, and writes an
-interactive `dashboard.html` back into Drive — identical output to the Python
-script (verified against the same data).
+It reads every Google Sheet in a folder, parses the 11 tabs, and writes a
+**timestamped** `dashboard_YYYY-MM-DD_HHMM.html` back into Drive — older
+snapshots are kept, so a history builds up. It produces the same dashboard as
+the command-line version (verified against the same data).
 
 ## What's here
 
@@ -33,29 +34,41 @@ script (verified against the same data).
    (`drive.google.com/drive/folders/`**`THIS_PART`**). Optionally set `TITLE`.
 
 4. **Run once.** Select `generateDashboard` in the toolbar and click **Run**.
-   Approve the permission prompt (it needs access to your Drive). A fresh
-   `dashboard.html` appears in the folder — download it, or right-click →
-   *Open with → Preview* / a browser.
+   Approve the permission prompt (it needs access to your Drive). A timestamped
+   `dashboard_YYYY-MM-DD_HHMM.html` appears in the folder.
 
-## Keep it fresh automatically — pick one
+## How you'll view it
 
-- **Daily trigger.** Run `installDailyTrigger` once. The dashboard regenerates
-  every night (~4am), so the file in Drive is always current.
+**Google Drive does not render HTML pages** — double-clicking the generated file
+just offers a download, not the running dashboard. So set up the web app, which
+is the everyday way to look at the dashboard:
 
-- **A live URL (web app).** **Deploy → New deployment → Web app**, execute as
-  *you*, access *anyone in your org* (or *anyone with the link*). You get a URL
-  that renders the current snapshot on every visit — bookmark it, share it, done.
-  Nothing to download.
+- **Live URL (web app) — do this.** **Deploy → New deployment → Web app**,
+  execute as *you*, access *anyone in your org* (or *anyone with the link*). You
+  get a URL that renders the current dashboard on every visit — bookmark it and
+  share it with the group. Nothing to download, always up to date.
+
+- **A past snapshot.** To look at an archived day, download that timestamped
+  `.html` from Drive (right-click → **Download**) and open it in a browser. Each
+  file is self-contained and opens with no internet.
+
+## Keep it fresh automatically — pick any
+
+- **Daily trigger.** Run `installDailyTrigger` once. A fresh timestamped
+  snapshot is written every night (~4am).
 
 - **A button in a Sheet.** If you bind the script to a Google Sheet (Extensions →
   Apps Script from a Sheet), a **Group Dashboard → Regenerate now** menu appears.
+
+The web-app URL always shows the latest, so you don't need to regenerate files
+just to view current data — the files are your dated archive.
 
 ## PDF
 
 The dashboard draws itself with JavaScript, so a faithful PDF needs a real
 browser to run that code:
 
-- **Zero-install:** open `dashboard.html` (or the web-app URL) and use the
+- **Zero-install:** open the web-app URL (or a downloaded snapshot) and use the
   browser's **Print → Save as PDF**. A print stylesheet is included, so it
   paginates cleanly and forces a light theme.
 - **Automated:** run `python generate_dashboard.py <folder> --pdf` on any
