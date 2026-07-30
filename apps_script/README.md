@@ -17,25 +17,33 @@ the command-line version (verified against the same data).
 | `Code.gs` | the logic (parsing, aggregation, rendering) |
 | `dashboard_template.html` | the HTML/CSS/JS shell (generated from the Python template via `python generate_dashboard.py --dump-template`) |
 
-## Setup (about 5 minutes, once)
+## Setup (about 5 minutes, once — you only do this)
 
-1. **Collect the records in one Drive folder** as *Google Sheets*. When members
-   upload an `.xlsx`, open it once in Google Sheets (or turn on Drive Settings →
-   *Convert uploaded files to Google Docs editor format*) so it becomes a Sheet.
+You need to do this **once**. Group members never see any of it.
 
-2. **Create the script.** Go to [script.google.com](https://script.google.com) →
-   **New project**. Then:
-   - Paste `Code.gs` over the default `Code.gs`.
-   - Add an **HTML file** (＋ → HTML) named exactly **`dashboard_template`**, and
-     paste in the contents of `dashboard_template.html`.
+1. **Make one Drive folder** and put the members' records in it as *Google
+   Sheets*. (If someone uploads an `.xlsx`, open it and do **File → Save as
+   Google Sheets** so it counts.) Put one more empty Google Sheet in the folder
+   and call it e.g. **"Dashboard control".**
 
-3. **Point it at your folder.** In `Code.gs`, set `FOLDER_ID` to your Drive
-   folder's id — the long string in the folder URL
-   (`drive.google.com/drive/folders/`**`THIS_PART`**). Optionally set `TITLE`.
+2. **Open the script editor.** In that "Dashboard control" sheet, click
+   **Extensions → Apps Script**. A code editor opens in a new tab.
 
-4. **Run once.** Select `generateDashboard` in the toolbar and click **Run**.
-   Approve the permission prompt (it needs access to your Drive). A timestamped
-   `dashboard_YYYY-MM-DD_HHMM.html` appears in the folder.
+3. **Paste in the two files.**
+   - Select everything in the `Code.gs` panel and replace it with the contents
+     of this folder's `Code.gs`.
+   - Click the **＋** next to *Files* → **HTML**, name it exactly
+     **`dashboard_template`**, and paste in the contents of
+     `dashboard_template.html`. Click the save icon.
+
+4. **Run it once.** Pick `generateDashboard` in the toolbar dropdown and click
+   **▶ Run**. Approve the Google permission prompt. That's it — a timestamped
+   `dashboard_YYYY-MM-DD_HHMM.html` is written into your folder.
+
+Because the script lives in a Sheet **inside** the folder, it finds the folder
+on its own — there's nothing to configure. (If you'd rather keep the script
+somewhere else, paste your folder's id into `FOLDER_ID` at the top of `Code.gs`;
+it's the long string in the folder's URL after `/folders/`.)
 
 ## How you'll view it
 
@@ -57,8 +65,8 @@ is the everyday way to look at the dashboard:
 - **Daily trigger.** Run `installDailyTrigger` once. A fresh timestamped
   snapshot is written every night (~4am).
 
-- **A button in a Sheet.** If you bind the script to a Google Sheet (Extensions →
-  Apps Script from a Sheet), a **Group Dashboard → Regenerate now** menu appears.
+- **A button in your control Sheet.** Reload the "Dashboard control" sheet and a
+  **Group Dashboard → Regenerate now** menu appears — click it any time.
 
 The web-app URL always shows the latest, so you don't need to regenerate files
 just to view current data — the files are your dated archive.

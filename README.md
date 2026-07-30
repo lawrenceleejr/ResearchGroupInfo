@@ -33,17 +33,27 @@ dashboard rebuilds itself on a schedule or at the click of a button.
    into a Drive folder shared with your group, and **open it in Google Sheets**
    (so it becomes a Google Sheet).
 
-2. **Each member keeps their own copy up to date.** Everyone makes a copy named
-   for themselves — `JaneDoe_Info` — and keeps it current: new talks, papers,
-   milestones, grants, conferences, and schools as they happen. The dropdown
-   menus keep everyone's entries consistent. This is a *living* database:
-   members update it whenever something changes, not once a year.
+2. **Each member keeps their own copy up to date.** This is all a group member
+   ever has to do — no code, no downloads, no setup:
+
+   > **For group members (copy/paste this to your group):**
+   > 1. Open the template in the shared Drive folder.
+   > 2. **File → Make a copy**, into the same folder.
+   > 3. Rename the copy to your name, e.g. `JaneDoe_Info`.
+   > 4. Fill in the **Overview** tab — that's the only required one. Add talks,
+   >    papers, grants, conferences, etc. on the other tabs as you have them.
+   > 5. Keep it updated whenever something changes. That's it.
+
+   The dropdown menus keep everyone's entries consistent. This is a *living*
+   database: members update it whenever something changes, not once a year.
 
 3. **Set up the Apps Script once.** Follow
-   [`apps_script/README.md`](apps_script/README.md) — you paste in two files,
-   point it at your Drive folder, and click **Run**. From then on it can:
+   [`apps_script/README.md`](apps_script/README.md) — in a Sheet inside the
+   folder you open **Extensions → Apps Script**, paste in two files, and click
+   **Run**. No IDs to configure (it finds the folder on its own). From then on
+   it can:
    - regenerate the dashboard on a **daily schedule**,
-   - regenerate on demand from a **menu button**, and/or
+   - regenerate on demand from a **menu button** in that Sheet, and/or
    - serve a **live web-app URL** the whole group can bookmark.
 
    Every run writes a **timestamped** file into your Drive folder —
@@ -109,9 +119,12 @@ stylesheet is included so it paginates cleanly.
 
 ## The template (11 tabs)
 
+Only **Overview** is required; every other tab is an optional log you fill in as
+you have things to add.
+
 | Tab | What it captures |
 |-----|------------------|
-| **Overview** | Identity & timeline (incl. **rank**: undergrad / grad / postdoc / **faculty** / research staff), milestones & exams, thesis topic & projects |
+| **Overview** *(required)* | Identity & timeline (incl. **rank**: undergrad / grad / postdoc / **faculty** / research staff), milestones & exams, thesis topic & projects |
 | **Committee** | Thesis committee members, meeting log, annual progress reports |
 | **Roles** | Teaching, service, collaboration roles, mentoring |
 | **Presentations** | Talks, posters, seminars |

@@ -15,27 +15,28 @@
  * as a Web app (see README) and use that URL; to view an archived snapshot,
  * download that timestamped .html and open it in a browser.
  *
- * SETUP
- *   1. Put the members' records in one Drive folder (as Google Sheets — open
- *      each .xlsx in Google Sheets once, or upload with "Convert uploads" on).
- *   2. Create an Apps Script project (script.google.com → New project).
- *   3. Add two files: this Code.gs, and an HTML file named exactly
- *      `dashboard_template` whose contents are apps_script/dashboard_template.html.
- *   4. Set FOLDER_ID below to the Drive folder's id (the long string in its URL).
- *   5. Run `generateDashboard` once and grant permissions.
+ * SETUP (see apps_script/README.md for the click-by-click version)
+ *   1. Put the members' records in one Drive folder, each as a Google Sheet.
+ *   2. In a Google Sheet inside that folder: Extensions → Apps Script.
+ *   3. Paste this into Code.gs, and add an HTML file named exactly
+ *      `dashboard_template` with the contents of dashboard_template.html.
+ *   4. Run `generateDashboard` once and grant permissions. (The folder is
+ *      detected automatically; or set FOLDER_ID below to be explicit.)
  *
  * OPTIONAL
  *   - `installDailyTrigger()` regenerates the dashboard every night.
- *   - Deploy → New deployment → Web app to get a live, always-current URL
- *     (doGet renders on demand).
+ *   - Deploy → New deployment → Web app for a live, always-current URL.
  *
  * PDF: the dashboard draws itself with JavaScript, so a faithful PDF needs a
- *   browser. Open dashboard.html and use the browser's Print → Save as PDF
- *   (a print stylesheet is included), or run generate_dashboard.py --pdf.
+ *   browser. Open the web-app URL (or a downloaded snapshot) and use the
+ *   browser's Print → Save as PDF, or run generate_dashboard.py --pdf.
  */
 
-var FOLDER_ID = 'PUT_YOUR_DRIVE_FOLDER_ID_HERE';
-var OUTPUT_FOLDER_ID = '';            // blank = write into FOLDER_ID
+// Leave FOLDER_ID blank to auto-detect (the folder that holds this script's
+// Sheet). Or paste your Drive folder's id — the long string in its URL:
+//   drive.google.com/drive/folders/THIS_PART
+var FOLDER_ID = '';
+var OUTPUT_FOLDER_ID = '';            // blank = write into the same folder
 var TITLE = 'Research Group — Dashboard';
 var TEMPLATE_FILE = 'dashboard_template';   // name of the HTML file in this project
 
@@ -56,10 +57,11 @@ function onOpen() {
 }
 
 function generateDashboard() {
-  var model = buildModel_(readPeople_(), TITLE);
+  var folderId = resolveFolderId_();
+  var model = buildModel_(readPeople_(folderId), TITLE);
   var html = renderHtml_(model);
   var out = OUTPUT_FOLDER_ID ? DriveApp.getFolderById(OUTPUT_FOLDER_ID)
-                             : DriveApp.getFolderById(FOLDER_ID);
+                             : DriveApp.getFolderById(folderId);
   // Timestamped filename (date + time) so every run is kept and a history
   // builds up in Drive. Only an exact same-minute name is replaced.
   var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm');
@@ -74,10 +76,41 @@ function generateDashboard() {
 
 /** Live web-app endpoint: renders the current snapshot on each request. */
 function doGet() {
-  var model = buildModel_(readPeople_(), TITLE);
+  var model = buildModel_(readPeople_(resolveFolderId_()), TITLE);
   return HtmlService.createHtmlOutput(renderHtml_(model))
     .setTitle(TITLE)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Work out which Drive folder holds the records:
+ *   1. the FOLDER_ID constant if you set one, else
+ *   2. a value remembered from a previous run, else
+ *   3. the folder that contains this script's Google Sheet (bound scripts).
+ * The resolved id is remembered so daily triggers and the web app work too.
+ */
+function resolveFolderId_() {
+  var props = PropertiesService.getScriptProperties();
+  if (FOLDER_ID && FOLDER_ID.indexOf('PUT_YOUR') === -1) {
+    props.setProperty('FOLDER_ID', FOLDER_ID);
+    return FOLDER_ID;
+  }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) {
+      var parents = DriveApp.getFileById(ss.getId()).getParents();
+      if (parents.hasNext()) {
+        var id = parents.next().getId();
+        props.setProperty('FOLDER_ID', id);
+        return id;
+      }
+    }
+  } catch (e) { /* not a bound script or no Drive access yet */ }
+  var saved = props.getProperty('FOLDER_ID');
+  if (saved) return saved;
+  throw new Error(
+    'Could not find the records folder. Either run this from a Google Sheet ' +
+    'inside that folder, or set FOLDER_ID at the top of Code.gs to the folder id.');
 }
 
 function installDailyTrigger() {
@@ -187,8 +220,8 @@ function values_(sheet) { return sheet ? sheet.getDataRange().getValues() : null
 
 /* ============================ parsing ============================ */
 
-function readPeople_() {
-  var folder = DriveApp.getFolderById(FOLDER_ID);
+function readPeople_(folderId) {
+  var folder = DriveApp.getFolderById(folderId || resolveFolderId_());
   var files = folder.getFilesByType(MimeType.GOOGLE_SHEETS);
   var names = [];
   while (files.hasNext()) names.push(files.next());
@@ -202,6 +235,15 @@ function readPeople_() {
       Logger.log('SKIP %s: %s', f.getName(), e);
     }
   });
+  // Nudge if members left records as un-converted Excel uploads (skipped above).
+  var xlsx = folder.getFilesByType(MimeType.MICROSOFT_EXCEL);
+  var nx = 0;
+  while (xlsx.hasNext()) { xlsx.next(); nx++; }
+  if (nx) Logger.log('Note: %s Excel (.xlsx) file(s) ignored — open each in ' +
+                     'Google Sheets (File → Save as Google Sheets) so it is counted.', nx);
+  if (!people.length) throw new Error(
+    'No Google Sheet records found in the folder. Make sure each member\'s file ' +
+    'is a Google Sheet (not an .xlsx upload).');
   return people;
 }
 
