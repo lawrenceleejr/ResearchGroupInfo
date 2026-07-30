@@ -568,6 +568,7 @@ def main(argv=None) -> int:
     paths = sorted(
         p for p in glob.glob(os.path.join(args.input_dir, "*.xlsx"))
         if not os.path.basename(p).startswith(("~$", "."))
+        and "template" not in os.path.basename(p).lower()  # skip the blank template
     )
     if not paths:
         sys.exit(f"No .xlsx files found in {args.input_dir}")

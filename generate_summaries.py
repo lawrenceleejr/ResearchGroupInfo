@@ -75,6 +75,7 @@ def load_people(input_dir: str) -> list[dict]:
     paths = sorted(
         p for p in glob.glob(os.path.join(input_dir, "*.xlsx"))
         if not os.path.basename(p).startswith(("~$", "."))
+        and "template" not in os.path.basename(p).lower()  # skip the blank template
     )
     if not paths:
         sys.exit(f"No .xlsx files found in {input_dir}")

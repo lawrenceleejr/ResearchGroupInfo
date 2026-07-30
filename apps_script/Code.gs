@@ -4,16 +4,18 @@
  * Runs entirely on Google's servers against a Drive folder of member
  * "Research Record" spreadsheets. No command line, nothing to install.
  *
- * It reproduces generate_dashboard.py: it reads every Google Sheet in a folder,
- * parses the 11 tabs, and writes a timestamped `dashboard_YYYY-MM-DD_HHMM.html`
- * back into the folder (older snapshots are kept, so a history builds up). It can
- * run from a menu, on a daily time-driven trigger, or be published as a web app
- * so the whole group can bookmark a live URL.
+ * It reads every Google Sheet in a folder, parses the 11 tabs, and writes back
+ * into the folder (older snapshots are kept, so a history builds up):
+ *   - dashboard_YYYY-MM-DD_HHMM.html — the interactive dashboard snapshot
+ *   - group_report_YYYY-MM-DD_HHMM  — a Google Doc report (opens right in Drive)
+ *   - "Group Summaries"             — a Google Sheet of the five summary tables,
+ *                                     updated in place (opens right in Drive)
+ * It can run from a menu, on a daily time-driven trigger, or be published as a
+ * web app so the whole group can bookmark a live URL.
  *
- * VIEWING: Google Drive does not render HTML pages, so double-clicking the
- * generated file only offers a download. To view the dashboard live, deploy this
- * as a Web app (see README) and use that URL; to view an archived snapshot,
- * download that timestamped .html and open it in a browser.
+ * VIEWING: the Doc report and the summary Sheet open directly in Google Drive.
+ * The interactive HTML does not (Drive doesn't render HTML pages) — view it via
+ * the deployed web-app URL, or download a snapshot and open it in a browser.
  *
  * SETUP (see apps_script/README.md for the click-by-click version)
  *   1. Put the members' records in one Drive folder, each as a Google Sheet.
@@ -51,9 +53,24 @@ function onOpen() {
   try {
     SpreadsheetApp.getUi()
       .createMenu('Group Dashboard')
-      .addItem('Regenerate now', 'generateDashboard')
+      .addItem('Regenerate everything', 'generateAll')
+      .addSeparator()
+      .addItem('Dashboard (HTML snapshot)', 'generateDashboard')
+      .addItem('Doc report (opens in Drive)', 'generateDocReport')
+      .addItem('Summary Sheet (opens in Drive)', 'generateSummarySheet')
       .addToUi();
   } catch (e) { /* not a bound script */ }
+}
+
+/** One click: HTML snapshot + Doc report + summary Sheet. */
+function generateAll() {
+  var urls = {
+    dashboard: generateDashboard(),
+    report: generateDocReport(),
+    summaries: generateSummarySheet(),
+  };
+  Logger.log('Done: %s', JSON.stringify(urls));
+  return urls;
 }
 
 function generateDashboard() {
@@ -115,10 +132,11 @@ function resolveFolderId_() {
 
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'generateDashboard') ScriptApp.deleteTrigger(t);
+    var h = t.getHandlerFunction();
+    if (h === 'generateDashboard' || h === 'generateAll') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('generateDashboard').timeBased().everyDays(1).atHour(4).create();
-  Logger.log('Daily trigger installed (≈4am).');
+  ScriptApp.newTrigger('generateAll').timeBased().everyDays(1).atHour(4).create();
+  Logger.log('Daily trigger installed (≈4am): HTML snapshot + Doc report + summary Sheet.');
 }
 
 /* ============================ helpers ============================ */
@@ -228,7 +246,8 @@ function readPeople_(folderId) {
   names.sort(function (a, b) { return a.getName() < b.getName() ? -1 : 1; });
   var people = [];
   names.forEach(function (f) {
-    if (f.getName().toLowerCase().indexOf('dashboard') !== -1) return;
+    // Skip the tool's own outputs and the blank template sitting in the folder.
+    if (/dashboard|template|summar|report/i.test(f.getName())) return;
     try {
       people.push(parseSpreadsheet_(SpreadsheetApp.openById(f.getId()), f.getName()));
     } catch (e) {
@@ -432,6 +451,279 @@ function buildModel_(people, title) {
       grant_total: grantTotal
     }
   };
+}
+
+/* ============================ summaries ============================ */
+/* A port of generate_summaries.py: the same five tables, as 2-D arrays whose
+ * first row is the header. Pure data — testable without any Google API. */
+
+var SCHOOL_RE_ = /\b(school|academy|tutorial)\b/i;
+
+function yearOf_(s) {
+  var m = String(s || '').match(/(?:19|20)\d{2}/);
+  return m ? m[0] : '';
+}
+
+function venueSeries_(v) {
+  var s = String(v || '').trim();
+  var out = s.replace(/[\s,'’]*(?:19|20)\d{2}\s*$/, '')
+             .replace(/^[\s,\-–]+|[\s,\-–]+$/g, '');
+  return out || s;
+}
+
+function sortedJoin_(arr) {
+  return arr.filter(function (v, i) { return v && arr.indexOf(v) === i; })
+            .sort().join('; ');
+}
+
+function collectAttendance_(people) {
+  var recs = [];
+  people.forEach(function (p) {
+    (p.events || []).forEach(function (r) {
+      var name = (r.event || '').trim();
+      if (!name) return;
+      recs.push({person: p.name, name: name, year: yearOf_(r.start),
+                 location: r.location || '', descriptor: r.type || '',
+                 isSchool: SCHOOL_RE_.test((r.type || '') + ' ' + name)});
+    });
+    (p.presentations || []).forEach(function (r) {
+      var venue = (r.venue || '').trim();
+      if (!venue) return;
+      recs.push({person: p.name, name: venue, year: yearOf_(r.date),
+                 location: r.location || '', descriptor: r.type || '',
+                 isSchool: (r.type || '').trim().toLowerCase() === 'lecture' ||
+                           SCHOOL_RE_.test(venue)});
+    });
+  });
+  return recs;
+}
+
+function aggregateEvents_(records, wantSchools) {
+  var agg = {};
+  records.forEach(function (rec) {
+    if (rec.isSchool !== wantSchools) return;
+    var key = venueSeries_(rec.name).toLowerCase();
+    if (!agg[key]) agg[key] = {name: venueSeries_(rec.name), attendees: [],
+                               years: [], locations: [], types: [], seen: {}, count: 0};
+    var e = agg[key];
+    var dedup = rec.person.toLowerCase() + '|' + rec.year;
+    if (e.seen[dedup]) return;
+    e.seen[dedup] = true;
+    e.attendees.push(rec.person);
+    e.years.push(rec.year);
+    e.locations.push(rec.location);
+    e.types.push(rec.descriptor);
+    e.count++;
+  });
+  var rows = Object.keys(agg).map(function (k) { return agg[k]; });
+  rows.sort(function (a, b) {
+    return (b.count - a.count) || a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+  return rows;
+}
+
+function summaryTables_(people) {
+  var pres = [['Person', 'Type', 'Venue / meeting', 'Location', 'Date', 'Title',
+               'Invited?', 'External travel funding', 'Link']];
+  var pubs = [['Person', 'Title', 'Role', 'Journal / collaboration', 'Status',
+               'Date', 'DOI / link']];
+  var grants = [['Holder', 'Grant / award title', 'Agency / sponsor', 'Role',
+                 'Amount', 'Start', 'End', 'Status', 'Grant no. / notes']];
+  people.forEach(function (p) {
+    (p.presentations || []).forEach(function (r) {
+      pres.push([p.name, r.type, r.venue, r.location, r.date, r.title,
+                 r.invited, r.travel, r.link]);
+    });
+    (p.publications || []).forEach(function (r) {
+      pubs.push([p.name, r.title, r.role, r.journal, r.status, r.date, r.doi]);
+    });
+    (p.grants || []).forEach(function (r) {
+      grants.push([p.name, r.title, r.agency, r.role, r.amount, r.start,
+                   r.end, r.status, r.notes]);
+    });
+  });
+  var records = collectAttendance_(people);
+  var conf = [['Conference / meeting', 'Attendees', '# Attendees', 'Years',
+               'Locations', '# Attendances', 'Roles / contributions']];
+  aggregateEvents_(records, false).forEach(function (e) {
+    var uniq = e.attendees.filter(function (v, i) { return e.attendees.indexOf(v) === i; });
+    conf.push([e.name, uniq.slice().sort().join('; '), uniq.length,
+               sortedJoin_(e.years), sortedJoin_(e.locations), e.count,
+               sortedJoin_(e.types)]);
+  });
+  var schools = [['School / course', 'Attendees', '# Attendees', 'Years',
+                  'Locations', '# Attendances']];
+  aggregateEvents_(records, true).forEach(function (e) {
+    var uniq = e.attendees.filter(function (v, i) { return e.attendees.indexOf(v) === i; });
+    schools.push([e.name, uniq.slice().sort().join('; '), uniq.length,
+                  sortedJoin_(e.years), sortedJoin_(e.locations), e.count]);
+  });
+  return {presentations: pres, publications: pubs, conferences: conf,
+          schools: schools, grants: grants};
+}
+
+/* ============================ summary Sheet ============================ */
+
+/**
+ * Write/update the "Group Summaries" Google Sheet in the folder — one tab per
+ * summary table. Updated in place so the group has a single stable, natively
+ * viewable Sheet (the timestamped HTML/Doc outputs are the dated archive);
+ * cell A1's note records when each tab was last refreshed.
+ */
+function generateSummarySheet() {
+  var folderId = resolveFolderId_();
+  var people = readPeople_(folderId);
+  var tables = summaryTables_(people);
+  var folder = DriveApp.getFolderById(OUTPUT_FOLDER_ID || folderId);
+  var name = 'Group Summaries';
+  var it = folder.getFilesByName(name);
+  var ss;
+  if (it.hasNext()) {
+    ss = SpreadsheetApp.openById(it.next().getId());
+  } else {
+    ss = SpreadsheetApp.create(name);
+    DriveApp.getFileById(ss.getId()).moveTo(folder);
+  }
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  [['Presentations', tables.presentations],
+   ['Publications', tables.publications],
+   ['Conferences', tables.conferences],
+   ['Schools', tables.schools],
+   ['Grants', tables.grants]].forEach(function (pair) {
+    writeTab_(ss, pair[0], pair[1], stamp);
+  });
+  var def = ss.getSheetByName('Sheet1');
+  if (def && ss.getSheets().length > 1) ss.deleteSheet(def);
+  Logger.log('Updated "%s" → %s', name, ss.getUrl());
+  return ss.getUrl();
+}
+
+function writeTab_(ss, name, data, stamp) {
+  var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clear();
+  var ncols = data[0].length;
+  var rect = data.map(function (row) {
+    var r = row.slice(0, ncols).map(function (c) { return c == null ? '' : c; });
+    while (r.length < ncols) r.push('');
+    return r;
+  });
+  sh.getRange(1, 1, rect.length, ncols).setValues(rect);
+  sh.getRange(1, 1, 1, ncols).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  sh.autoResizeColumns(1, ncols);
+  sh.getRange(1, 1).setNote('Generated ' + stamp + ' from ' + (data.length - 1) + ' row(s).');
+}
+
+/* ============================ Doc report ============================ */
+
+function money_(n) {
+  return '$' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function docTable_(body, headers, rows) {
+  var data = [headers].concat(rows).map(function (row) {
+    return row.map(function (c) { return String(c == null ? '' : c); });
+  });
+  var t = body.appendTable(data);
+  t.setBorderWidth(0.5);
+  for (var i = 0; i < headers.length; i++) {
+    t.getRow(0).getCell(i).editAsText().setBold(true);
+  }
+  return t;
+}
+
+function docSection_(body, title, headers, rows) {
+  if (!rows.length) return;
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  docTable_(body, headers, rows);
+}
+
+/**
+ * Write a timestamped Google Doc report into the folder. Unlike the HTML
+ * dashboard, a Doc opens directly in Google Drive with a double click.
+ */
+function generateDocReport() {
+  var folderId = resolveFolderId_();
+  var people = readPeople_(folderId);
+  var model = buildModel_(people, TITLE);
+  var tables = summaryTables_(people);
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm');
+
+  var doc = DocumentApp.create('group_report_' + stamp);
+  var body = doc.getBody();
+  var k = model.kpis;
+
+  body.appendParagraph(TITLE).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  var sub = body.appendParagraph(
+    k.people + ' members · ' + k.students + ' students, ' + k.postdocs +
+    ' postdocs' + (k.faculty ? ', ' + k.faculty + ' faculty/staff' : '') +
+    ' · generated ' + model.group.generated);
+  sub.editAsText().setItalic(true);
+
+  var kpiRows = [
+    ['People', k.people], ['Students', k.students], ['Postdocs', k.postdocs],
+    ['Faculty / staff', k.faculty], ['Research themes', k.themes], ['Sites', k.sites],
+    ['Quals passed', k.quals], ['Comps passed', k.comps],
+    ['Publications', k.publications], ['Presentations', k.presentations],
+    ['Awards', k.awards], ['Active grants', k.grants],
+    ['Funding on the books', k.grant_total ? money_(k.grant_total) : 0],
+  ].filter(function (r) { return r[1]; });
+  docSection_(body, 'Key numbers', ['Measure', 'Value'], kpiRows);
+
+  docSection_(body, 'People', ['Name', 'Rank', 'Theme', 'Year', 'Site', 'Funding'],
+    model.people.map(function (p) {
+      return [p.name, p.rank, p.theme, p.program_year || '—', p.site || '—', p.funding || '—'];
+    }));
+
+  var students = model.people.filter(isStudent_);
+  docSection_(body, 'Milestones & exams',
+    ['Student', 'Qual', 'Comp', 'Committee', 'Author', 'Defense'],
+    students.map(function (p) {
+      var g = function (key) { return ((p.milestones || {})[key] || {}).status || '—'; };
+      return [p.name, g('qual'), g('comp'), g('committee'), g('author'), g('defense')];
+    }));
+
+  docSection_(body, 'Grants & funding', tables.grants[0], tables.grants.slice(1));
+  docSection_(body, 'Applications & fellowships',
+    ['Person', 'Name', 'Type', 'Status', 'Date'],
+    model.applications.map(function (a) {
+      return [a.who, a.name, a.type, a.status, a.date];
+    }));
+  docSection_(body, 'Publications', tables.publications[0], tables.publications.slice(1));
+  docSection_(body, 'Presentations',
+    ['Person', 'Type', 'Venue', 'Date', 'Title'],
+    model.presentations.map(function (t) {
+      return [t.who, t.type, t.venue, t.date, t.title];
+    }));
+  docSection_(body, 'Conferences attended', tables.conferences[0], tables.conferences.slice(1));
+  docSection_(body, 'Schools attended', tables.schools[0], tables.schools.slice(1));
+  docSection_(body, 'Awards & honors',
+    ['Person', 'Award', 'Organization', 'Date', 'Amount'],
+    model.awards.map(function (a) {
+      return [a.who, a.award, a.org, a.date, a.amount];
+    }));
+  docSection_(body, 'Roles & service',
+    ['Person', 'Role', 'Category', 'Organization', 'Start', 'End'],
+    model.roles.map(function (r) {
+      return [r.who, r.role, r.category, r.org, r.start, r.end];
+    }));
+  docSection_(body, 'Outreach & education',
+    ['Person', 'Activity', 'Type', 'Audience / venue', 'Date', 'Role'],
+    model.outreach.map(function (o) {
+      return [o.who, o.activity, o.type, o.audience, o.date, o.role];
+    }));
+
+  var foot = body.appendParagraph(
+    'Generated ' + model.group.generated + ' from ' + people.length +
+    ' Research Record spreadsheet(s). The interactive dashboard has more detail; ' +
+    'this report is the directly-viewable snapshot.');
+  foot.editAsText().setItalic(true);
+
+  doc.saveAndClose();
+  var folder = DriveApp.getFolderById(OUTPUT_FOLDER_ID || folderId);
+  DriveApp.getFileById(doc.getId()).moveTo(folder);
+  Logger.log('Wrote %s → %s', doc.getName(), doc.getUrl());
+  return doc.getUrl();
 }
 
 /* ============================ render ============================ */

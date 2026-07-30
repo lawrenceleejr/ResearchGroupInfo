@@ -50,39 +50,42 @@ dashboard rebuilds itself on a schedule or at the click of a button.
 3. **Set up the Apps Script once.** Follow
    [`apps_script/README.md`](apps_script/README.md) — in a Sheet inside the
    folder you open **Extensions → Apps Script**, paste in two files, and click
-   **Run**. No IDs to configure (it finds the folder on its own). From then on
-   it can:
-   - regenerate the dashboard on a **daily schedule**,
-   - regenerate on demand from a **menu button** in that Sheet, and/or
-   - serve a **live web-app URL** the whole group can bookmark.
+   **Run**. No IDs to configure (it finds the folder on its own). Each run
+   writes **three outputs** into your Drive folder:
+   - a **Google Doc report** (`group_report_2026-07-30_1430`) — opens right in
+     Drive with a double-click,
+   - a **Group Summaries** Google Sheet (presentations, publications,
+     conferences, schools, grants tables) — also opens right in Drive, and
+   - a **timestamped interactive HTML dashboard**
+     (`dashboard_2026-07-30_1430.html`).
 
-   Every run writes a **timestamped** file into your Drive folder —
-   `dashboard_2026-07-30_1430.html` — so older snapshots are kept and a history
-   builds up automatically.
+   It can run on a **daily schedule**, from a **menu button** in that Sheet,
+   and/or serve a **live web-app URL** the whole group can bookmark.
+   Timestamped outputs are kept, so a history builds up automatically.
 
 Members never touch anything but their spreadsheet. Only the one-time setup
 above is done by you (or anyone comfortable clicking through a Google prompt).
 
-### How do I actually *see* the dashboard?
+### How do I actually *see* the outputs?
 
-Good question — and an important one, because **Google Drive does not render
-HTML pages**. If you just double-click the generated `dashboard_….html` in
-Drive, you'll get a limited preview or a **Download** button, not the running
-dashboard. Two ways to view it properly:
+- **The Doc report and the Group Summaries sheet open right in Drive** — just
+  double-click them, like any Google Doc or Sheet. For most everyday questions
+  ("what has the group presented this year?", "what grants are active?") these
+  are all you need, and they're the easiest things to share.
 
-- **Best — the live web-app URL.** When you deploy the Apps Script as a **web
-  app** (one step, covered in `apps_script/README.md`), you get a link that
-  renders the current dashboard right in the browser, always up to date. Share
-  that link with your group and bookmark it — this is the everyday way to look
-  at the dashboard. Nothing to download.
+- **The interactive HTML dashboard** is the richest view (filters, timelines,
+  sortable tables), but **Google Drive does not render HTML pages** —
+  double-clicking only offers a download. Two ways to view it properly:
+  - **Best — the live web-app URL.** Deploying the Apps Script as a **web app**
+    (one step, covered in `apps_script/README.md`) gives you a link that renders
+    the current dashboard right in the browser, always up to date. Bookmark it
+    and share it with the group.
+  - **For a past snapshot** — download that timestamped `.html` from Drive
+    (right-click → **Download**) and double-click it; each file is completely
+    self-contained and opens in any browser with no internet.
 
-- **For a past snapshot — download and open.** To look at a specific archived
-  day, download that timestamped `.html` from Drive and double-click it. Each
-  file is completely self-contained, so it opens in any browser with no
-  internet. (In Drive: right-click the file → **Download**.)
-
-So: **use the web-app URL to view the current dashboard; the timestamped files
-in Drive are your downloadable archive.**
+So: **double-click the Doc/Sheet for a quick look, use the web-app URL for the
+interactive dashboard, and the timestamped files are your archive.**
 
 ---
 
@@ -167,12 +170,14 @@ for it:
 Research themes and their colors are assigned automatically from whatever
 appears in the data, so the dashboard adapts to any group.
 
-## The summary CSVs
+## The summary tables
 
-The summaries (Apps Script or `generate_summaries.py`) are group-wide CSVs:
+Five group-wide tables — in Drive mode they're the tabs of the **Group
+Summaries** Google Sheet; at the command line, `generate_summaries.py` writes
+them as CSVs:
 
-| File | Contents |
-|------|----------|
+| Table | Contents |
+|-------|----------|
 | `presentations.csv` | Every talk / poster / seminar, one row each |
 | `publications.csv` | Every paper / note, one row each |
 | `conferences.csv` | Unique conferences attended — attendees, years, locations, counts |
