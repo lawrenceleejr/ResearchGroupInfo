@@ -57,7 +57,7 @@ def _year(date: str) -> str:
 def _venue_series(venue: str) -> str:
     """Normalise a venue to its series name by stripping a trailing year."""
     v = (venue or "").strip()
-    v = re.sub(r"[\s,'’]*(?:19|20)\d{2}\s*$", "", v).strip(" ,-–")
+    v = re.sub(r"[\s,'’]*(?:19|20)\d{2}[\s,.\-–]*$", "", v).strip(" ,-–")
     return v or (venue or "").strip()
 
 

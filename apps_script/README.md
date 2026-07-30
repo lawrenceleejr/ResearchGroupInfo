@@ -24,34 +24,21 @@ matches the command-line version (verified against the same data).
 | `Code.gs` | the logic (parsing, aggregation, rendering) |
 | `dashboard_template.html` | the HTML/CSS/JS shell (generated from the Python template via `python generate_dashboard.py --dump-template`) |
 
-## Setup (about 5 minutes, once — you only do this)
+## Setup
 
-You need to do this **once**. Group members never see any of it.
+The complete click-by-click setup lives in the
+[main README](../README.md#-recommended-run-it-inside-google-drive-no-command-line)
+— in short: create a "Dashboard control" Sheet inside the records folder, open
+**Extensions → Apps Script**, paste in `Code.gs` and `dashboard_template.html`
+(as an HTML file named exactly `dashboard_template`), and **▶ Run**
+`generateAll` once.
 
-1. **Make one Drive folder** and put the members' records in it as *Google
-   Sheets*. (If someone uploads an `.xlsx`, open it and do **File → Save as
-   Google Sheets** so it counts.) Put one more empty Google Sheet in the folder
-   and call it e.g. **"Dashboard control".**
-
-2. **Open the script editor.** In that "Dashboard control" sheet, click
-   **Extensions → Apps Script**. A code editor opens in a new tab.
-
-3. **Paste in the two files.**
-   - Select everything in the `Code.gs` panel and replace it with the contents
-     of this folder's `Code.gs`.
-   - Click the **＋** next to *Files* → **HTML**, name it exactly
-     **`dashboard_template`**, and paste in the contents of
-     `dashboard_template.html`. Click the save icon.
-
-4. **Run it once.** Pick `generateAll` in the toolbar dropdown and click
-   **▶ Run**. Approve the Google permission prompt. That's it — the Doc report,
-   the Group Summaries sheet, and a timestamped dashboard HTML appear in your
-   folder.
-
-Because the script lives in a Sheet **inside** the folder, it finds the folder
-on its own — there's nothing to configure. (If you'd rather keep the script
-somewhere else, paste your folder's id into `FOLDER_ID` at the top of `Code.gs`;
-it's the long string in the folder's URL after `/folders/`.)
+One extra note for non-standard setups: the script finds the folder on its own
+because it lives in a Sheet **inside** it. If you'd rather keep the script
+somewhere else, paste your folder's id into `FOLDER_ID` at the top of `Code.gs`
+(the long string in the folder's URL after `/folders/`). And if a member's
+record is an `.xlsx` upload rather than a Google Sheet, open it and do
+**File → Save as Google Sheets** so it counts.
 
 ## How you'll view it
 

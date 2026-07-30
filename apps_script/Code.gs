@@ -537,7 +537,7 @@ function yearOf_(s) {
 
 function venueSeries_(v) {
   var s = String(v || '').trim();
-  var out = s.replace(/[\s,'’]*(?:19|20)\d{2}\s*$/, '')
+  var out = s.replace(/[\s,'’]*(?:19|20)\d{2}[\s,.\-–]*$/, '')
              .replace(/^[\s,\-–]+|[\s,\-–]+$/g, '');
   return out || s;
 }

@@ -47,11 +47,23 @@ dashboard rebuilds itself on a schedule or at the click of a button.
    The dropdown menus keep everyone's entries consistent. This is a *living*
    database: members update it whenever something changes, not once a year.
 
-3. **Set up the Apps Script once.** Follow
-   [`apps_script/README.md`](apps_script/README.md) — in a Sheet inside the
-   folder you open **Extensions → Apps Script**, paste in two files, and click
-   **Run**. No IDs to configure (it finds the folder on its own). Each run
-   writes **three outputs** into your Drive folder:
+3. **Set up the generator once (~5 minutes, only you do this):**
+
+   1. In the same Drive folder, create one more **blank Google Sheet** and name
+      it **"Dashboard control"** (New → Google Sheets).
+   2. Open it and click **Extensions → Apps Script**. A code editor opens.
+   3. Select everything in the `Code.gs` panel and replace it with the contents
+      of [`apps_script/Code.gs`](apps_script/Code.gs).
+   4. Click the **＋** next to *Files* → **HTML**, name the new file exactly
+      **`dashboard_template`**, and paste in the contents of
+      [`apps_script/dashboard_template.html`](apps_script/dashboard_template.html).
+      Click the 💾 save icon.
+   5. In the toolbar dropdown pick **`generateAll`** and click **▶ Run**.
+      Approve the Google permission prompt (it needs access to your Drive).
+
+   That's the whole setup — no IDs to configure; the script finds the folder on
+   its own because it lives in a Sheet inside it. Each run writes **three
+   outputs** into your Drive folder:
    - a **Google Doc report** (`group_report_2026-07-30_1430`) — opens right in
      Drive with a double-click,
    - a **Group Summaries** Google Sheet (presentations, publications,
@@ -59,12 +71,22 @@ dashboard rebuilds itself on a schedule or at the click of a button.
    - a **timestamped interactive HTML dashboard**
      (`dashboard_2026-07-30_1430.html`).
 
-   It can run on a **daily schedule**, from a **menu button** in that Sheet,
-   and/or serve a **live web-app URL** the whole group can bookmark.
-   Timestamped outputs are kept, so a history builds up automatically.
+4. **Make it automatic (optional, one click each):**
+   - **Nightly refresh:** back in the script editor, pick `installDailyTrigger`
+     and click **▶ Run** once. All three outputs now refresh every night.
+   - **Live dashboard link:** click **Deploy → New deployment → Web app**
+     (execute as *you*; access: *anyone in your org* or *anyone with the link*).
+     The URL you get renders the current dashboard on every visit — bookmark it
+     and share it with the group.
+   - **A menu button:** reload the "Dashboard control" sheet and a **Group
+     Dashboard** menu appears — regenerate everything (or any one output) any
+     time, and **Update member records to latest template** after you change
+     the template.
 
 Members never touch anything but their spreadsheet. Only the one-time setup
 above is done by you (or anyone comfortable clicking through a Google prompt).
+More detail — updating the template safely, PDF options, troubleshooting — is
+in [`apps_script/README.md`](apps_script/README.md).
 
 ### How do I actually *see* the outputs?
 
@@ -77,9 +99,8 @@ above is done by you (or anyone comfortable clicking through a Google prompt).
   sortable tables), but **Google Drive does not render HTML pages** —
   double-clicking only offers a download. Two ways to view it properly:
   - **Best — the live web-app URL.** Deploying the Apps Script as a **web app**
-    (one step, covered in `apps_script/README.md`) gives you a link that renders
-    the current dashboard right in the browser, always up to date. Bookmark it
-    and share it with the group.
+    (step 4 above) gives you a link that renders the current dashboard right in
+    the browser, always up to date. Bookmark it and share it with the group.
   - **For a past snapshot** — download that timestamped `.html` from Drive
     (right-click → **Download**) and double-click it; each file is completely
     self-contained and opens in any browser with no internet.
@@ -239,6 +260,41 @@ sample_data/                                    generated sample records
 dashboard.html                                  demo dashboard (from sample_data)
 summaries/                                      demo CSVs (from sample_data)
 requirements.txt                                openpyxl (playwright optional, for --pdf)
+```
+
+## Tests & CI
+
+Every push and pull request runs the full suite on GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+
+- **Python tests** (`pytest`) — unit tests for the date/venue/money parsers and
+  rank logic, plus end-to-end runs on the committed sample records: KPI
+  regression, CSV outputs diffed against the committed demo, template
+  integrity (tabs, labels, dropdowns), and the template-in-folder exclusion.
+- **Apps Script tests** (`node tests/gas/gas.test.js`) — loads `Code.gs` with
+  stubbed Google APIs and asserts its KPIs and all five summary tables are
+  **cell-for-cell identical** to the Python edition's output, plus tests for
+  timestamped filenames, folder auto-detection, and the member-record updater
+  (adds exactly the missing tabs, never writes member data).
+- **Browser tests** — renders the generated dashboard in headless Chromium and
+  fails on any JavaScript error; checks sections populate and filters work.
+
+Run locally:
+
+```bash
+pip install -r requirements.txt pytest
+pytest -m "not browser"                      # Python suite
+python tests/gas/dump_fixture.py && node tests/gas/gas.test.js   # Apps Script suite
+pip install playwright && playwright install chromium
+pytest -m browser                            # browser smoke test
+```
+
+On pushes to `main`, CI also publishes a Docker image to GHCR, so the
+command-line version can run with **no Python installed**:
+
+```bash
+docker run --rm -v "$PWD/records:/data" ghcr.io/lawrenceleejr/researchgroupinfo \
+    /data -o /data/dashboard.html --title "My Group"
 ```
 
 ## Notes
