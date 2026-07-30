@@ -568,6 +568,7 @@ def main(argv=None) -> int:
     paths = sorted(
         p for p in glob.glob(os.path.join(args.input_dir, "*.xlsx"))
         if not os.path.basename(p).startswith(("~$", "."))
+        and "template" not in os.path.basename(p).lower()  # skip the blank template
     )
     if not paths:
         sys.exit(f"No .xlsx files found in {args.input_dir}")
@@ -588,6 +589,8 @@ def main(argv=None) -> int:
 
     stamp = model["group"]["generated"]  # YYYY-MM-DD, same date shown in the dashboard
     out_html = args.output if args.no_datestamp else add_stamp(args.output, stamp)
+    out_parent = os.path.dirname(os.path.abspath(out_html))
+    os.makedirs(out_parent, exist_ok=True)
     with open(out_html, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"\nWrote {out_html}  ({len(people)} member record(s), "
