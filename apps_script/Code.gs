@@ -5,9 +5,10 @@
  * "Research Record" spreadsheets. No command line, nothing to install.
  *
  * It reproduces generate_dashboard.py: it reads every Google Sheet in a folder,
- * parses the 11 tabs, and writes an interactive `dashboard.html` back into the
- * folder. It can run from a menu, on a daily time-driven trigger, or be
- * published as a web app so the whole group can bookmark a live URL.
+ * parses the 11 tabs, and writes a date-stamped `dashboard_YYYY-MM-DD.html` back
+ * into the folder (older snapshots are kept, so a history builds up). It can run
+ * from a menu, on a daily time-driven trigger, or be published as a web app so
+ * the whole group can bookmark a live URL.
  *
  * SETUP
  *   1. Put the members' records in one Drive folder (as Google Sheets — open
@@ -54,9 +55,12 @@ function generateDashboard() {
   var html = renderHtml_(model);
   var out = OUTPUT_FOLDER_ID ? DriveApp.getFolderById(OUTPUT_FOLDER_ID)
                              : DriveApp.getFolderById(FOLDER_ID);
-  var existing = out.getFilesByName('dashboard.html');
+  // Date-stamped filename so a history builds up in Drive. Only a file from
+  // the same day is replaced; older snapshots are kept.
+  var name = 'dashboard_' + model.group.generated + '.html';
+  var existing = out.getFilesByName(name);
   while (existing.hasNext()) existing.next().setTrashed(true);
-  var file = out.createFile('dashboard.html', html, MimeType.HTML);
+  var file = out.createFile(name, html, MimeType.HTML);
   Logger.log('Wrote %s (%s people) → %s',
              file.getName(), model.people.length, file.getUrl());
   return file.getUrl();

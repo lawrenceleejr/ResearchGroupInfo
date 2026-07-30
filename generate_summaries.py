@@ -27,12 +27,23 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as _dt
 import glob
 import os
 import re
 import sys
 
 from generate_dashboard import parse_workbook
+
+STAMP = ""  # set in main(); appended to each CSV filename unless --no-datestamp
+
+
+def out_path(out_dir: str, name: str) -> str:
+    """Build an output path, inserting the date stamp before the extension."""
+    if STAMP:
+        root, ext = os.path.splitext(name)
+        name = f"{root}_{STAMP}{ext}"
+    return os.path.join(out_dir, name)
 
 SCHOOL_RE = re.compile(r"\b(school|academy|tutorial)\b", re.I)
 SCHOOL_TYPES = {"lecture"}
@@ -79,7 +90,7 @@ def load_people(input_dir: str) -> list[dict]:
 
 
 def write_presentations(people, out_dir) -> int:
-    path = os.path.join(out_dir, "presentations.csv")
+    path = out_path(out_dir, "presentations.csv")
     n = 0
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -96,7 +107,7 @@ def write_presentations(people, out_dir) -> int:
 
 
 def write_publications(people, out_dir) -> int:
-    path = os.path.join(out_dir, "publications.csv")
+    path = out_path(out_dir, "publications.csv")
     n = 0
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -172,7 +183,7 @@ def _aggregate(records, want_schools: bool):
 
 
 def write_conferences(records, out_dir) -> int:
-    path = os.path.join(out_dir, "conferences.csv")
+    path = out_path(out_dir, "conferences.csv")
     agg = _aggregate(records, want_schools=False)
     rows = sorted(agg.values(), key=lambda e: (-e["count"], e["name"].lower()))
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -189,7 +200,7 @@ def write_conferences(records, out_dir) -> int:
 
 
 def write_schools(records, out_dir) -> int:
-    path = os.path.join(out_dir, "schools.csv")
+    path = out_path(out_dir, "schools.csv")
     agg = _aggregate(records, want_schools=True)
     rows = sorted(agg.values(), key=lambda e: (-e["count"], e["name"].lower()))
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -205,7 +216,7 @@ def write_schools(records, out_dir) -> int:
 
 
 def write_grants(people, out_dir) -> int:
-    path = os.path.join(out_dir, "grants.csv")
+    path = out_path(out_dir, "grants.csv")
     n = 0
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -226,11 +237,16 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input_dir", help="directory containing the per-person .xlsx records")
     ap.add_argument("-o", "--output-dir", default=".", help="directory to write the CSVs into")
+    ap.add_argument("--no-datestamp", action="store_true",
+                    help="do not append the generation date to output filenames")
     args = ap.parse_args(argv)
 
     if not os.path.isdir(args.input_dir):
         sys.exit(f"Not a directory: {args.input_dir}")
     os.makedirs(args.output_dir, exist_ok=True)
+
+    global STAMP
+    STAMP = "" if args.no_datestamp else _dt.date.today().isoformat()
 
     people = load_people(args.input_dir)
     print(f"Parsed {len(people)} record(s). Writing summaries to {args.output_dir}/")

@@ -41,8 +41,11 @@ to use, in → a shareable snapshot of everything the group is doing, out.
    python generate_summaries.py <folder> -o summaries/
    ```
 
-   Open `dashboard.html` in any browser. Everything is embedded — no server, no
-   internet needed. Re-run any time for a fresh snapshot.
+   Outputs are **date-stamped** by default — `dashboard_2026-07-30.html`,
+   `presentations_2026-07-30.csv`, etc. — so re-running builds up a history you
+   can browse instead of overwriting the last snapshot. (Add `--no-datestamp`
+   for stable filenames.) Open the HTML in any browser; everything is embedded —
+   no server, no internet needed.
 
 > **Nobody but you ever needs a command line** — members only edit their
 > spreadsheet in Drive. And step 3 can be automated away entirely: see
@@ -152,12 +155,13 @@ Sample records and pre-built output are included:
 
 ```bash
 python make_sample_data.py                                   # writes sample_data/*.xlsx
-python generate_dashboard.py sample_data -o dashboard.html   # -> dashboard.html
-python generate_summaries.py sample_data -o summaries/       # -> summaries/*.csv
+python generate_dashboard.py sample_data --pdf               # -> dashboard_<date>.html + .pdf
+python generate_summaries.py sample_data -o summaries/       # -> summaries/*_<date>.csv
 ```
 
-The committed [`dashboard.html`](dashboard.html) and [`summaries/`](summaries/)
-are that demo output.
+The committed [`dashboard.html`](dashboard.html), [`dashboard.pdf`](dashboard.pdf),
+and [`summaries/`](summaries/) are that demo output, generated with
+`--no-datestamp` so the links here stay stable.
 
 ## Files
 

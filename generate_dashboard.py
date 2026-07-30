@@ -491,6 +491,12 @@ def build_model(people: list[dict], title: str) -> dict:
 #  HTML rendering
 # --------------------------------------------------------------------------- #
 
+def add_stamp(path: str, stamp: str) -> str:
+    """Insert a `_<stamp>` before the extension: dashboard.html -> dashboard_2026-07-30.html."""
+    root, ext = os.path.splitext(path)
+    return f"{root}_{stamp}{ext}"
+
+
 def render_html(model: dict) -> str:
     data_json = json.dumps(model, ensure_ascii=False, indent=None)
     # guard against an accidental </script> inside data
@@ -537,6 +543,8 @@ def main(argv=None) -> int:
     ap.add_argument("input_dir", nargs="?",
                     help="directory containing the per-person .xlsx records")
     ap.add_argument("-o", "--output", default="dashboard.html", help="output HTML file")
+    ap.add_argument("--no-datestamp", action="store_true",
+                    help="do not append the generation date to output filenames")
     ap.add_argument("--title", default="Research Group — Dashboard", help="dashboard title")
     ap.add_argument("--pdf", nargs="?", const="__auto__", default=None,
                     metavar="PATH", help="also write a PDF (default: alongside the HTML)")
@@ -577,14 +585,20 @@ def main(argv=None) -> int:
 
     model = build_model(people, args.title)
     html = render_html(model)
-    with open(args.output, "w", encoding="utf-8") as f:
+
+    stamp = model["group"]["generated"]  # YYYY-MM-DD, same date shown in the dashboard
+    out_html = args.output if args.no_datestamp else add_stamp(args.output, stamp)
+    with open(out_html, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"\nWrote {args.output}  ({len(people)} member record(s), "
+    print(f"\nWrote {out_html}  ({len(people)} member record(s), "
           f"{len(model['themes'])} theme(s))")
 
     if args.pdf is not None:
-        pdf_path = args.pdf if args.pdf != "__auto__" else os.path.splitext(args.output)[0] + ".pdf"
-        export_pdf(args.output, pdf_path, chrome=args.chrome)
+        if args.pdf != "__auto__":
+            pdf_path = args.pdf if args.no_datestamp else add_stamp(args.pdf, stamp)
+        else:
+            pdf_path = os.path.splitext(out_html)[0] + ".pdf"
+        export_pdf(out_html, pdf_path, chrome=args.chrome)
     return 0
 
 
