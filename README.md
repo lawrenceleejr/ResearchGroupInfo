@@ -241,6 +241,41 @@ summaries/                                      demo CSVs (from sample_data)
 requirements.txt                                openpyxl (playwright optional, for --pdf)
 ```
 
+## Tests & CI
+
+Every push and pull request runs the full suite on GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+
+- **Python tests** (`pytest`) — unit tests for the date/venue/money parsers and
+  rank logic, plus end-to-end runs on the committed sample records: KPI
+  regression, CSV outputs diffed against the committed demo, template
+  integrity (tabs, labels, dropdowns), and the template-in-folder exclusion.
+- **Apps Script tests** (`node tests/gas/gas.test.js`) — loads `Code.gs` with
+  stubbed Google APIs and asserts its KPIs and all five summary tables are
+  **cell-for-cell identical** to the Python edition's output, plus tests for
+  timestamped filenames, folder auto-detection, and the member-record updater
+  (adds exactly the missing tabs, never writes member data).
+- **Browser tests** — renders the generated dashboard in headless Chromium and
+  fails on any JavaScript error; checks sections populate and filters work.
+
+Run locally:
+
+```bash
+pip install -r requirements.txt pytest
+pytest -m "not browser"                      # Python suite
+python tests/gas/dump_fixture.py && node tests/gas/gas.test.js   # Apps Script suite
+pip install playwright && playwright install chromium
+pytest -m browser                            # browser smoke test
+```
+
+On pushes to `main`, CI also publishes a Docker image to GHCR, so the
+command-line version can run with **no Python installed**:
+
+```bash
+docker run --rm -v "$PWD/records:/data" ghcr.io/lawrenceleejr/researchgroupinfo \
+    /data -o /data/dashboard.html --title "My Group"
+```
+
 ## Notes
 
 - The Google Drive method needs nothing installed. For the command-line method

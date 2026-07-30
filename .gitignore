@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 ~$*
 .DS_Store
+tests/gas/.fixture/
+.pytest_cache/
