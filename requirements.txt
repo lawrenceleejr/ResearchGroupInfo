@@ -1,1 +1,4 @@
 openpyxl>=3.1
+
+# Optional: only needed for "generate_dashboard.py --pdf"
+# playwright>=1.40   (then: playwright install chromium)

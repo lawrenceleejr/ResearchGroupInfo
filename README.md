@@ -44,6 +44,34 @@ to use, in → a shareable snapshot of everything the group is doing, out.
    Open `dashboard.html` in any browser. Everything is embedded — no server, no
    internet needed. Re-run any time for a fresh snapshot.
 
+> **Nobody but you ever needs a command line** — members only edit their
+> spreadsheet in Drive. And step 3 can be automated away entirely: see
+> [**Running it inside Google Drive**](#running-it-inside-google-drive-no-command-line).
+
+### Getting a PDF
+
+Add `--pdf` to also export a PDF snapshot (great for reports and reviews):
+
+```bash
+python generate_dashboard.py <folder> --pdf
+```
+
+This uses a headless browser so the PDF matches the live page exactly. One-time
+setup: `pip install playwright && playwright install chromium`. No Python handy?
+Just open `dashboard.html` and use your browser's **Print → Save as PDF** — a
+print stylesheet is included so it paginates cleanly.
+
+## Running it inside Google Drive (no command line)
+
+Don't want to run anything at all? The [`apps_script/`](apps_script/) folder is a
+**Google Apps Script** version that runs on Google's servers against your Drive
+folder. Set it up once (about 5 minutes) and it will regenerate the dashboard in
+Drive on a **daily schedule**, from a **menu button**, or serve a **live URL**
+the whole group can bookmark. Members just keep their spreadsheets up to date —
+no installs, no downloads, no terminal. See
+[`apps_script/README.md`](apps_script/README.md). It produces the identical
+dashboard to the Python script (verified against the same data).
+
 > Google Sheets export: *File → Download → Microsoft Excel (.xlsx)*. Downloading
 > the whole Drive folder as a zip and unzipping it gives you the input folder in
 > one step.
@@ -136,19 +164,21 @@ are that demo output.
 ```
 template/FirstnameLastname_Info_Template.xlsx   the master spreadsheet (11 tabs)
 build_template.py                               (re)builds the template
-generate_dashboard.py                           a folder of records -> HTML dashboard
+generate_dashboard.py                           a folder of records -> HTML dashboard (+ optional PDF)
 generate_summaries.py                           a folder of records -> summary CSVs
 make_sample_data.py                             writes illustrative sample records
+apps_script/                                    Google Apps Script port (no command line)
 sample_data/                                    generated sample records
 dashboard.html                                  demo dashboard (from sample_data)
 summaries/                                      demo CSVs (from sample_data)
-requirements.txt                                openpyxl
+requirements.txt                                openpyxl (playwright optional, for --pdf)
 ```
 
 ## Notes
 
-- The only dependency is `openpyxl`; the generated dashboard has **zero**
-  dependencies and works offline by double-clicking.
+- The only required dependency is `openpyxl`; the generated dashboard has
+  **zero** dependencies and works offline by double-clicking. PDF export needs
+  `playwright` (optional).
 - The parser finds fields by their **labels**, not fixed cell coordinates, so
   inserted rows are fine — only the tab and label names need to stay intact.
 - Dates written as `2024`, `2024-03`, or `2024 Fall` are all understood.
