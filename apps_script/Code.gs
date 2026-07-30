@@ -58,6 +58,8 @@ function onOpen() {
       .addItem('Dashboard (HTML snapshot)', 'generateDashboard')
       .addItem('Doc report (opens in Drive)', 'generateDocReport')
       .addItem('Summary Sheet (opens in Drive)', 'generateSummarySheet')
+      .addSeparator()
+      .addItem('Update member records to latest template', 'updateMemberRecords')
       .addToUi();
   } catch (e) { /* not a bound script */ }
 }
@@ -71,6 +73,75 @@ function generateAll() {
   };
   Logger.log('Done: %s', JSON.stringify(urls));
   return urls;
+}
+
+/* ===================== template updates (additive only) ===================== */
+
+// Dropdowns and layout live in this top-left region of each tab; validation
+// refresh is confined to it so nothing else is touched.
+var DV_REGION_ROWS = 60;
+var DV_REGION_COLS = 12;
+
+/**
+ * Upgrade every member record to the latest template, without touching data.
+ *
+ * Strictly additive: for each member Sheet in the folder it (a) copies over any
+ * tab that exists in the template but is missing from the member's file
+ * (formatting and dropdowns included), and (b) refreshes the dropdown rules on
+ * tabs the member already has, so new options (e.g. a new rank or status)
+ * appear. Data rows, filled cells, and anything the member wrote are never
+ * modified, moved, or deleted — which is also why the template policy is
+ * "only add tabs/labels/options; never rename or remove them".
+ *
+ * The master is the Google Sheet in the folder whose name contains "template".
+ * Safe to run repeatedly; run it after you change the template.
+ */
+function updateMemberRecords() {
+  var folderId = resolveFolderId_();
+  var folder = DriveApp.getFolderById(folderId);
+  var files = folder.getFilesByType(MimeType.GOOGLE_SHEETS);
+  var template = null, members = [];
+  while (files.hasNext()) {
+    var f = files.next();
+    if (/template/i.test(f.getName())) { if (!template) template = f; continue; }
+    if (/dashboard|summar|report/i.test(f.getName())) continue;
+    members.push(f);
+  }
+  if (!template) {
+    throw new Error('No template found: keep a Google Sheet whose name ' +
+                    'contains "template" in the folder.');
+  }
+  members.sort(function (a, b) { return a.getName() < b.getName() ? -1 : 1; });
+
+  var tmpl = SpreadsheetApp.openById(template.getId());
+  var tmplSheets = tmpl.getSheets();
+  var report = [];
+  members.forEach(function (f) {
+    var ss = SpreadsheetApp.openById(f.getId());
+    var added = [], refreshed = 0;
+    tmplSheets.forEach(function (ts) {
+      var name = ts.getName();
+      var target = ss.getSheetByName(name);
+      if (!target) {
+        ts.copyTo(ss).setName(name);
+        added.push(name);
+      } else {
+        var rows = Math.min(DV_REGION_ROWS, ts.getMaxRows(), target.getMaxRows());
+        var cols = Math.min(DV_REGION_COLS, ts.getMaxColumns(), target.getMaxColumns());
+        if (rows < 1 || cols < 1) return;
+        var rules = ts.getRange(1, 1, rows, cols).getDataValidations();
+        target.getRange(1, 1, rows, cols).setDataValidations(rules);
+        refreshed++;
+      }
+    });
+    var line = f.getName() + ' — added: ' +
+               (added.length ? added.join(', ') : 'none') +
+               '; dropdowns refreshed on ' + refreshed + ' tab(s)';
+    report.push(line);
+    Logger.log(line);
+  });
+  Logger.log('Updated %s member record(s) from "%s".', members.length, template.getName());
+  return report;
 }
 
 function generateDashboard() {

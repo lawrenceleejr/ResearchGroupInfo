@@ -82,6 +82,22 @@ it's the long string in the folder's URL after `/folders/`.)
 The web-app URL always shows the latest, so you don't need to regenerate files
 just to view current data — the files are your dated archive.
 
+## Updating the template later
+
+When you improve the template (a new tab, a new dropdown option), members'
+already-filled records don't break — the parser reads by tab/label names and
+treats every tab except Overview as optional. To actually push the new pieces
+into everyone's file, keep the template Sheet in the folder (its name must
+contain "template") and click **Group Dashboard → Update member records to
+latest template**. For each member Sheet it:
+
+- copies in any **missing tabs** (formatting and dropdowns included), and
+- **refreshes the dropdown lists** on tabs they already have,
+
+and never touches anything a member has written. It's safe to run repeatedly.
+The corresponding template policy: **only add tabs/labels/options — never
+rename, remove, or reorder them.**
+
 ## PDF
 
 The dashboard draws itself with JavaScript, so a faithful PDF needs a real

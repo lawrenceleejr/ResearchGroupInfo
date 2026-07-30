@@ -145,6 +145,25 @@ event type, …) keep the data consistent so the tool can aggregate it cleanly.
 Regenerate the template yourself with `python build_template.py` (it adds the
 faculty option and the two newest tabs to the base workbook).
 
+### Updating the template after people have filled it out
+
+Two rules make template evolution painless:
+
+1. **The template only ever adds — tabs, labels, dropdown options. Nothing is
+   renamed, removed, or reordered.** Because the tool reads records by tab and
+   label names (and every tab except Overview is optional), records made from
+   *any* past version of the template keep working forever. A member on an old
+   copy simply doesn't feed the newer sections.
+
+2. **When you want members' files upgraded, use the one-click updater.** In the
+   Drive edition, the **Group Dashboard → Update member records to latest
+   template** menu item goes through every member's Sheet and (a) copies in any
+   tab they're missing — formatting and dropdowns included — and (b) refreshes
+   the dropdown lists on tabs they already have, so new options appear. It
+   never modifies, moves, or deletes anything a member has written, and it's
+   safe to run repeatedly. Update the template Sheet in the folder, click the
+   menu item, done — members do nothing.
+
 ---
 
 ## The dashboard
