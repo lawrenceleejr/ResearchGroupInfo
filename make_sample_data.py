@@ -17,6 +17,30 @@ OUT = "sample_data"
 # label -> value for the Overview sheet (identity + research block)
 PEOPLE = [
     {
+        "file": "LawrenceLee_Info.xlsx",
+        "overview": {
+            "Rank": "Faculty", "Full name": "Lawrence Lee",
+            "Research theme / area": "Collider (CMS)",
+            "Program start (year / term)": "2019 Fall", "Started with the group": "2019 Fall",
+            "Current program year": "N/A", "Expected graduation term": "N/A",
+            "Appointment / effort": "full-time", "Primary site / base": "UTK",
+            "Primary funding source": "NSF / DOE",
+            "Primary project(s)": "Multijet BSM search; Muon cooling / collider",
+            "Current focus / status": "Group PI — collider + accelerator programs",
+        },
+        "milestones": {},
+        "grants": [
+            ["1", "CAREER: Searches for new physics with jets", "NSF", "PI", "$700,000", "2021-08", "2026-07", "Active", "PHY-21xxxxx"],
+            ["2", "Muon collider R&D", "DOE Office of Science", "Co-PI", "$1,200,000", "2024-08", "2027-07", "Active", "DE-SC00xxxxx"],
+            ["3", "US-CMS operations program", "NSF", "Senior personnel", "$300,000", "2023-01", "2028-12", "Active", ""],
+            ["4", "Detector R&D instrumentation", "DOE", "PI", "$450,000", "2026-01", "", "Pending", "under review"],
+        ],
+        "events": [
+            ["1", "Conference", "APS April Meeting", "Sacramento, CA", "2025-04", "2025-04", "Session chair", "Yes", ""],
+            ["2", "Collaboration meeting", "CMS Week", "CERN", "2026-03", "2026-03", "Attendee", "No", ""],
+        ],
+    },
+    {
         "file": "JohnnyAppleseed_Info.xlsx",
         "overview": {
             "Rank": "Grad student", "Full name": "Johnny Appleseed",
@@ -35,7 +59,7 @@ PEOPLE = [
                        "Author qualification (if applicable)": ("Passed", "2023-09", "CMS", ""),
                        "Thesis defense": ("Scheduled", "2027-04", "UTK", "")},
         "presentations": [
-            ["1", "Contributed talk", "APS April", "Sacramento, CA", "2025-04", "Multijet search status", "No", 800, ""],
+            ["1", "Contributed talk", "APS April Meeting", "Sacramento, CA", "2025-04", "Multijet search status", "No", 800, ""],
         ],
         "publications": [
             ["1", "Search for multijet resonances in pp collisions", "Analysis contact", "JHEP / CMS", "Under review", "2026-02", "10.xxxx/multijet"],
@@ -45,6 +69,10 @@ PEOPLE = [
         ],
         "roles": [
             ["1", "Analysis contact", "Collaboration role", "CMS EXO", "2024-06", "ongoing", ""],
+        ],
+        "events": [
+            ["1", "Conference", "APS April Meeting", "Sacramento, CA", "2025-04", "2025-04", "Contributed talk", "Yes", ""],
+            ["2", "Summer school", "CMSDAS", "FNAL", "2023-01", "2023-01", "Attendee", "No", "data analysis school"],
         ],
     },
     {
@@ -91,6 +119,11 @@ PEOPLE = [
             ["2", "Poster", "USMCC 2025", "Chicago, IL", "2025-06", "Cooling cell optimization", "No", 0, ""],
             ["3", "Contributed talk", "IMCC 2026", "CERN", "2026-05", "Updated cooling results", "No", 1200, ""],
             ["4", "Lecture", "US Particle Accelerator School 2025", "Knoxville, TN", "2025-01", "Attendee — accelerator physics", "No", 0, ""],
+        ],
+        "events": [
+            ["1", "Summer school", "US Particle Accelerator School", "Knoxville, TN", "2025-01", "2025-01", "Attendee", "No", "2-week course"],
+            ["2", "Conference", "USMCC", "Chicago, IL", "2025-06", "2025-06", "Contributed talk", "Yes", ""],
+            ["3", "Conference", "IMCC", "CERN", "2026-05", "2026-05", "Contributed talk", "Yes", ""],
         ],
         "awards": [
             ["1", "Best Poster Prize", "USMCC", "2025-06", "$500", ""],
@@ -183,8 +216,10 @@ def fill(person):
             r += 1
 
     fill_table("Presentations", person.get("presentations", []))
+    fill_table("Conferences & Schools", person.get("events", []))
     fill_table("Publications", person.get("publications", []))
     fill_table("Applications", person.get("applications", []))
+    fill_table("Grants & Funding", person.get("grants", []))
     fill_table("Awards", person.get("awards", []))
     fill_table("Roles", person.get("roles", []))
     fill_table("Outreach & education", person.get("outreach", []))

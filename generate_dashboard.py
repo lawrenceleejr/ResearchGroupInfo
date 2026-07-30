@@ -318,6 +318,30 @@ def parse_workbook(path: str) -> dict:
                      "amount": v[4], "notes": v[5]}
                 )
 
+    # ---- Conferences & Schools (attendance) --------------------------------
+    person["events"] = []
+    ev = sheet("Conferences & Schools", "Conferences and Schools", "Conferences")
+    if ev is not None:
+        h = find_label_row(ev, "#")
+        if h:
+            for v in read_table(ev, h, 9):
+                person["events"].append(
+                    {"type": v[1], "event": v[2], "location": v[3], "start": v[4],
+                     "end": v[5], "role": v[6], "presented": v[7], "notes": v[8]}
+                )
+
+    # ---- Grants & Funding --------------------------------------------------
+    person["grants"] = []
+    gr = sheet("Grants & Funding", "Grants and Funding", "Grants")
+    if gr is not None:
+        h = find_label_row(gr, "#")
+        if h:
+            for v in read_table(gr, h, 9):
+                person["grants"].append(
+                    {"title": v[1], "agency": v[2], "role": v[3], "amount": v[4],
+                     "start": v[5], "end": v[6], "status": v[7], "notes": v[8]}
+                )
+
     wb.close()
     return person
 
@@ -341,9 +365,28 @@ def is_postdoc(person: dict) -> bool:
     return "postdoc" in (person.get("rank", "").lower())
 
 
+def is_faculty(person: dict) -> bool:
+    r = person.get("rank", "").lower()
+    return ("faculty" in r) or ("professor" in r) or (" pi" in f" {r}") or ("staff" in r)
+
+
 def is_student(person: dict) -> bool:
     r = person.get("rank", "").lower()
+    if is_postdoc(person) or is_faculty(person):
+        return False
     return ("grad" in r) or ("student" in r) or ("undergrad" in r)
+
+
+def parse_money(value) -> float:
+    """Pull a number out of a currency-ish string ('$50,000' -> 50000.0)."""
+    s = _clean(value)
+    if not s:
+        return 0.0
+    s = re.sub(r"[^0-9.]", "", s)
+    try:
+        return float(s) if s else 0.0
+    except ValueError:
+        return 0.0
 
 
 def build_model(people: list[dict], title: str) -> dict:
@@ -385,8 +428,9 @@ def build_model(people: list[dict], title: str) -> dict:
     now = _dt.datetime.now()
     now_dec = now.year + (now.month - 1) / 12.0 + (now.day / 31.0) / 12.0
 
-    n_students = sum(1 for p in people if is_student(p) and not is_postdoc(p))
+    n_students = sum(1 for p in people if is_student(p))
     n_postdocs = sum(1 for p in people if is_postdoc(p))
+    n_faculty = sum(1 for p in people if is_faculty(p))
 
     def passed(key):
         c = 0
@@ -399,6 +443,12 @@ def build_model(people: list[dict], title: str) -> dict:
     apps = flat("applications")
     n_awarded = sum(1 for a in apps if a.get("status", "").lower() == "awarded")
 
+    grants = flat("grants")
+    active_grants = sum(1 for g in grants
+                        if g.get("status", "").lower() in ("active", "awarded"))
+    grant_total = sum(parse_money(g.get("amount"))
+                      for g in grants if g.get("status", "").lower() in ("active", "awarded"))
+
     model = {
         "group": {
             "title": title,
@@ -410,6 +460,8 @@ def build_model(people: list[dict], title: str) -> dict:
         "projects": projects,
         "membership": membership,
         "applications": apps,
+        "grants": grants,
+        "events": flat("events"),
         "presentations": flat("presentations"),
         "awards": flat("awards"),
         "publications": flat("publications"),
@@ -419,6 +471,7 @@ def build_model(people: list[dict], title: str) -> dict:
             "people": len(people),
             "students": n_students,
             "postdocs": n_postdocs,
+            "faculty": n_faculty,
             "themes": len(themes),
             "sites": len({p.get("site", "") for p in people if p.get("site")}),
             "quals": passed("qual"),
@@ -427,6 +480,8 @@ def build_model(people: list[dict], title: str) -> dict:
             "presentations": sum(len(p.get("presentations", [])) for p in people),
             "awards": sum(len(p.get("awards", [])) for p in people),
             "awarded": n_awarded,
+            "grants": active_grants,
+            "grant_total": grant_total,
         },
     }
     return model
@@ -625,8 +680,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="matrix" id="matrix"></div>
   </section>
 
+  <section id="sec-grants">
+    <h2>Grants &amp; funding <span class="note">the group's funded portfolio</span></h2>
+    <div id="grantsTable"></div>
+  </section>
+
   <section id="sec-funding">
-    <h2>Applications &amp; funding pipeline <span class="note">by status</span></h2>
+    <h2>Applications &amp; fellowship pipeline <span class="note">individual applications, by status</span></h2>
     <div class="board" id="fundingBoard"></div>
   </section>
 
@@ -638,6 +698,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <section id="sec-talks">
     <h2>Presentations &amp; awards <span class="note">on record</span></h2>
     <div class="talks" id="talks"></div>
+  </section>
+
+  <section id="sec-events">
+    <h2>Conferences &amp; schools <span class="note">events attended</span></h2>
+    <div id="eventsTable"></div>
   </section>
 
   <section id="sec-roles">
@@ -674,7 +739,8 @@ const hide=(id,on)=>{const s=$(id);if(s)s.classList.toggle("hidden-sec",on);s.st
 /* ---------- header ---------- */
 $("#title").textContent=DATA.group.title;
 $("#subtitle").textContent=`${people.length} member${people.length!==1?"s":""} · `
-  +`${DATA.kpis.students} student${DATA.kpis.students!==1?"s":""}, ${DATA.kpis.postdocs} postdoc${DATA.kpis.postdocs!==1?"s":""} · `
+  +`${DATA.kpis.students} student${DATA.kpis.students!==1?"s":""}, ${DATA.kpis.postdocs} postdoc${DATA.kpis.postdocs!==1?"s":""}`
+  +(DATA.kpis.faculty?`, ${DATA.kpis.faculty} faculty/staff`:"")+` · `
   +`${DATA.themes.length} theme${DATA.themes.length!==1?"s":""} · generated ${DATA.group.generated}`;
 $("#footer").innerHTML=`Generated from ${people.length} Research Record spreadsheet(s) on ${DATA.group.generated}. `
   +`Each member maintains their own workbook; re-run <code>generate_dashboard.py</code> to refresh.`;
@@ -696,11 +762,12 @@ function renderKPIs(){
   const box=$("#kpis");box.innerHTML="";
   const k=DATA.kpis;
   const items=[
-    [k.people,"People"],[k.students,"Students"],[k.postdocs,"Postdocs"],
+    [k.people,"People"],[k.students,"Students"],[k.postdocs,"Postdocs"],[k.faculty,"Faculty / staff"],
     [k.themes,"Themes"],[k.sites,"Sites"],
     [k.quals,"Quals passed"],[k.comps,"Comps passed"],
     [k.publications,"Publications"],[k.presentations,"Presentations"],
-    [k.awards,"Awards"],[k.awarded,"Funding awarded"],
+    [k.awards,"Awards"],[k.grants,"Active grants"],
+    [k.grant_total?("$"+Math.round(k.grant_total).toLocaleString()):0,"Funding on the books"],
   ].filter(([n])=>n);
   items.forEach(([n,l])=>{const d=el("div","kpi");d.append(el("div","n",n),el("div","l",l));box.append(d);});
 }
@@ -877,6 +944,44 @@ function renderTalks(){
     box.append(row);});
 }
 
+/* ---------- grants & funding ---------- */
+function renderGrants(){
+  const rows=DATA.grants.filter(g=>match(g.key));
+  const sec=$("#sec-grants");
+  if(!rows.length){sec.style.display="none";return;}sec.style.display="";
+  const rank={active:0,awarded:1,pending:2,submitted:3,planned:4,completed:5,declined:6};
+  rows.sort((a,b)=>(rank[(a.status||"").toLowerCase()]??9)-(rank[(b.status||"").toLowerCase()]??9));
+  const t=el("table");
+  t.innerHTML=`<thead><tr><th>Holder</th><th>Grant / award</th><th>Agency</th><th>Role</th><th>Amount</th><th>Period</th><th>Status</th></tr></thead>`;
+  const tb=el("tbody");
+  rows.forEach(g=>{const tr=el("tr");
+    const period=[g.start,g.end].filter(Boolean).join(" – ");
+    tr.innerHTML=`<td><span class="theme-dot" style="background:${themeColor(g.key)}"></span>${esc(g.who)}</td>`
+      +`<td>${esc(g.title)}</td><td class="muted">${esc(g.agency)}</td><td class="muted">${esc(g.role)}</td>`
+      +`<td>${esc(g.amount)}</td><td class="muted">${esc(period)}</td><td>${pill(g.status)}</td>`;
+    tb.append(tr);});
+  t.append(tb);$("#grantsTable").innerHTML="";$("#grantsTable").append(t);
+}
+
+/* ---------- conferences & schools ---------- */
+function renderEvents(){
+  const rows=DATA.events.filter(e=>match(e.key));
+  const sec=$("#sec-events");
+  if(!rows.length){sec.style.display="none";return;}sec.style.display="";
+  rows.sort((a,b)=>String(b.start||"").localeCompare(String(a.start||"")));
+  const t=el("table");
+  t.innerHTML=`<thead><tr><th>Person</th><th>Type</th><th>Event</th><th>Location</th><th>Date</th><th>Role</th><th>Presented?</th></tr></thead>`;
+  const tb=el("tbody");
+  rows.forEach(e=>{const tr=el("tr");
+    const dstr=e.end&&e.end!==e.start?`${esc(e.start)} – ${esc(e.end)}`:esc(e.start);
+    tr.innerHTML=`<td><span class="theme-dot" style="background:${themeColor(e.key)}"></span>${esc(e.who)}</td>`
+      +`<td>${esc(e.type)}</td><td>${esc(e.event)}</td><td class="muted">${esc(e.location)}</td>`
+      +`<td class="muted">${dstr}</td><td class="muted">${esc(e.role)}</td>`
+      +`<td>${/yes/i.test(e.presented||"")?'<span class="pill ok">✓ yes</span>':'<span class="pill na">no</span>'}</td>`;
+    tb.append(tr);});
+  t.append(tb);$("#eventsTable").innerHTML="";$("#eventsTable").append(t);
+}
+
 /* ---------- generic record table ---------- */
 function renderRecordTable(secId,tableId,rows,cols){
   const sec=$(secId);
@@ -906,8 +1011,8 @@ function renderOutreach(){
 /* ---------- render all ---------- */
 function renderAll(){
   renderFilters();renderKPIs();renderCohort();renderPostdoc();renderPeople();
-  renderMilestones();renderMatrix();renderFunding();renderPubs();renderTalks();
-  renderRoles();renderOutreach();
+  renderMilestones();renderMatrix();renderGrants();renderFunding();renderPubs();
+  renderTalks();renderEvents();renderRoles();renderOutreach();
 }
 
 $("#themeBtn").onclick=()=>{
